@@ -73,7 +73,7 @@ var systemRouter = router({
 });
 
 // server/db.ts
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 var dataDir = path.resolve(process.cwd(), "data");
@@ -89,8 +89,8 @@ var defaultSettings = {
   tagline: "Experi\xEAncias digitais em outro n\xEDvel.",
   announcement: "NOVIDADES EXCLUSIVAS DISPON\xCDVEIS AGORA",
   logoUrl: "",
-  backgroundUrl: "/hero-background.jpg",
-  heroSlides: JSON.stringify(["/hero-background.jpg", "/1001254920.jpg"]),
+  backgroundUrl: "/metal-waves.gif",
+  heroSlides: JSON.stringify(["/metal-waves.gif", "/hero-background.jpg", "/1001254920.jpg"]),
   adminAvatarUrl: "/admin-profile.jpg",
   telegramUrl: "https://t.me/",
   whatsappUrl: "https://wa.me/558296084798",
@@ -109,7 +109,7 @@ var defaultSettings = {
   supportMode: "both",
   updatedAt: now()
 };
-var seedState = () => ({ settings: { ...defaultSettings }, products: [{ id: 1, name: "Venda Inteligente com IA", category: "Ebooks", description: "Comece do zero e transforme conhecimento em vendas.", oldPrice: "R$ 29,90", price: "R$ 19,90", badge: "33% OFF", imageUrl: "/hero-background.jpg", detailImageUrl: "/hero-background.jpg", stock: 8, isFeatured: true, active: true, createdAt: now() }, { id: 2, name: "Manual de Tr\xE1fego Pago", category: "M\xE9todos", description: "Leve sua empresa ao pr\xF3ximo n\xEDvel com an\xFAncios.", oldPrice: "R$ 35,90", price: "R$ 19,90", badge: "44% OFF", imageUrl: "/1001254920.jpg", detailImageUrl: "/1001254920.jpg", stock: 3, isFeatured: true, active: true, createdAt: now() }], tickets: [], suggestions: [], announcements: [], stockRequests: [], leads: [], portfolio: [], users: [] });
+var seedState = () => ({ settings: { ...defaultSettings }, products: [{ id: 1, name: "Venda Inteligente com IA", category: "Ebooks", description: "Comece do zero e transforme conhecimento em vendas.", oldPrice: "R$ 29,90", price: "R$ 19,90", badge: "33% OFF", imageUrl: "/hero-background.jpg", detailImageUrl: "/hero-background.jpg", stock: 8, isFeatured: true, active: true, createdAt: now() }, { id: 2, name: "Manual de Tr\xE1fego Pago", category: "M\xE9todos", description: "Leve sua empresa ao pr\xF3ximo n\xEDvel com an\xFAncios.", oldPrice: "R$ 35,90", price: "R$ 19,90", badge: "44% OFF", imageUrl: "/1001254920.jpg", detailImageUrl: "/1001254920.jpg", stock: 3, isFeatured: true, active: true, createdAt: now() }], tickets: [], suggestions: [], announcements: [], stockRequests: [], leads: [], portfolio: [], users: [], accessCodes: [] });
 async function ensureData() {
   await mkdir(dataDir, { recursive: true });
   try {
@@ -305,6 +305,62 @@ async function addAdmin(openId) {
     else state.users.push({ id: nextId(state.users), openId, name: "Administrador", role: "admin", createdAt: now(), updatedAt: now(), lastSignedIn: now() });
   });
 }
+async function getUserDirectory() {
+  const state = await readState();
+  const admins = new Set(state.users.filter((user) => user.role === "admin").map((user) => String(user.openId || "")));
+  const directory = new Map();
+  for (const user of state.users) {
+    const openId = String(user.openId || "").trim();
+    if (openId) directory.set(openId, { openId, name: user.name || "Usuário", email: user.email || "", source: "conta", isAdmin: admins.has(openId) });
+  }
+  for (const [collection, source] of [["leads", "lead"], ["tickets", "ticket"], ["suggestions", "sugestão"], ["stockRequests", "estoque"]]) {
+    for (const item of state[collection] || []) {
+      const contact = String(item.contact || item.email || "").trim();
+      if (!contact) continue;
+      const openId = `contact:${contact}`;
+      if (!directory.has(openId)) directory.set(openId, { openId, name: item.name || item.customerName || "Cliente", email: contact, source, isAdmin: admins.has(openId) });
+    }
+  }
+  return [...directory.values()].sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || String(a.name).localeCompare(String(b.name), "pt-BR"));
+}
+function hashAccessValue(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+async function generateAccessCode(productId, deliveryUrl, note = "") {
+  if (!/^(https?:\/\/|\/)/i.test(String(deliveryUrl).trim())) throw new Error("Use um link HTTP(S) ou caminho local de entrega");
+  const code = `MTGX-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
+  const state = await writeState((current) => {
+    const product = current.products.find((item) => item.id === Number(productId) && item.active !== false);
+    if (!product) throw new Error("Produto não encontrado");
+    current.accessCodes ??= [];
+    current.accessCodes.push({ id: nextId(current.accessCodes), codeHash: hashAccessValue(code), codePreview: code.slice(-7), productId: product.id, productName: product.name, deliveryUrl: String(deliveryUrl).trim(), note: String(note).trim(), status: "available", createdAt: now(), usedAt: null, accessTokenHash: null });
+  });
+  return { code, ...state.accessCodes.at(-1) };
+}
+async function listAccessCodes() {
+  return (await readState()).accessCodes.map(({ codeHash, accessTokenHash, ...record }) => record);
+}
+async function redeemAccessCode(code) {
+  const normalized = String(code).toUpperCase().replace(/\s/g, "");
+  let response;
+  await writeState((state) => {
+    const record = (state.accessCodes ?? []).find((item) => item.codeHash === hashAccessValue(normalized));
+    if (!record) throw new Error("Código não encontrado");
+    if (record.status !== "available") throw new Error("Este código já foi utilizado");
+    const token = randomBytes(24).toString("base64url");
+    record.status = "used";
+    record.usedAt = now();
+    record.accessTokenHash = hashAccessValue(token);
+    const product = state.products.find((item) => item.id === record.productId) ?? {};
+    response = { accessToken: token, product: { id: product.id, name: product.name ?? record.productName, description: product.description ?? "", imageUrl: product.imageUrl ?? "", deliveryUrl: record.deliveryUrl, note: record.note } };
+  });
+  return response;
+}
+async function getAccess(token) {
+  const record = (await readState()).accessCodes.find((item) => item.status === "used" && item.accessTokenHash === hashAccessValue(token));
+  if (!record) return null;
+  return { productId: record.productId, productName: record.productName, deliveryUrl: record.deliveryUrl, note: record.note, usedAt: record.usedAt };
+}
 
 // server/routers.ts
 import { z as z2 } from "zod";
@@ -370,9 +426,13 @@ var appRouter = router({
       return updatePortfolio(id, values);
     }),
     deletePortfolio: adminProcedure.input(z2.object({ id: z2.number() })).mutation(({ input }) => deletePortfolio(input.id)),
+    accessCodes: adminProcedure.query(() => listAccessCodes()),
+    generateAccessCode: adminProcedure.input(z2.object({ productId: z2.number(), deliveryUrl: z2.string().min(1), note: z2.string().optional() })).mutation(({ input }) => generateAccessCode(input.productId, input.deliveryUrl, input.note)),
+    userDirectory: adminProcedure.query(() => getUserDirectory()),
     admins: adminProcedure.query(() => listAdmins()),
     addAdmin: adminProcedure.input(z2.object({ openId: z2.string().min(3) })).mutation(({ input }) => addAdmin(input.openId))
-  })
+  }),
+  access: router({ redeem: publicProcedure.input(z2.object({ code: z2.string().min(8) })).mutation(({ input }) => redeemAccessCode(input.code)) })
 });
 
 // server/_core/context.ts
@@ -522,6 +582,10 @@ async function startServer() {
   });
   app.get("/api/admin/stats", adminOnly, async (_req, res) => res.json(await getDashboardStats()));
   app.get("/api/admin/inbox", adminOnly, async (_req, res) => res.json({ tickets: await listTickets(), leads: await listPurchaseLeads(), suggestions: await listSuggestions(), stockRequests: await listStockRequests() }));
+  app.get("/api/admin/access-codes", adminOnly, async (_req, res) => res.json(await listAccessCodes()));
+  app.post("/api/admin/access-codes", adminOnly, async (req, res) => res.status(201).json(await generateAccessCode(Number(body(req).productId), String(body(req).deliveryUrl ?? ""), String(body(req).note ?? ""))));
+  app.post("/api/access/redeem", async (req, res) => { try { return res.json(await redeemAccessCode(String(body(req).code ?? ""))); } catch (error) { return res.status(String(error.message).includes("utilizado") ? 409 : 404).json({ error: error.message }); } });
+  app.get("/api/access/:token", async (req, res) => { const access = await getAccess(req.params.token); return access ? res.json(access) : res.status(404).json({ error: "Acesso não encontrado" }); });
   app.post("/api/tickets", async (req, res) => res.status(201).json(await createTicket(body(req))));
   app.post("/api/leads", async (req, res) => res.status(201).json(await createPurchaseLead(body(req))));
   app.post("/api/suggestions", async (req, res) => res.status(201).json(await createSuggestion(body(req))));

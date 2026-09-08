@@ -1,0 +1,298 @@
+/* MTGX Stores — responsive stability pass
+   This file is intentionally loaded after the compiled bundle so the static package
+   stays editable and resilient without requiring the original source tree. */
+:root {
+  --mtgx-content-max: 1240px;
+  --mtgx-page-gutter: clamp(16px, 3.2vw, 42px);
+  --mtgx-touch: 44px;
+  --mtgx-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { min-width: 280px; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+body { min-width: 280px; max-width: 100%; margin: 0; overflow-x: hidden; }
+img, svg, video, canvas { max-width: 100%; }
+img { height: auto; }
+button, input, select, textarea { font: inherit; max-width: 100%; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+:where(button, a, [role="button"]):focus-visible,
+:where(input, select, textarea):focus-visible { outline: 2px solid #a9c8ff; outline-offset: 3px; }
+
+/* Public storefront: keep the grid from creating horizontal overflow. */
+#root { min-height: 100dvh; min-width: 0; }
+main, section, article, header, footer, nav, aside { min-width: 0; }
+.container, .section-block, .process-section, .split-section, .hero, .hero-section {
+  width: min(100%, var(--mtgx-content-max));
+  margin-inline: auto;
+}
+.hero, .hero-section, .process-section, .split-section { min-width: 0; }
+.hero img, .hero-card img, .product-card img, .portfolio-card img { display: block; width: 100%; object-fit: cover; }
+.product-grid, .catalog-grid, .portfolio-grid, .notice-grid, .channel-grid, .quick-grid {
+  min-width: 0;
+}
+.product-card, .portfolio-card, .notice-card, .channel-card, .quick-card {
+  min-width: 0;
+  overflow: hidden;
+}
+.product-card *, .portfolio-card *, .notice-card *, .channel-card *, .quick-card * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Admin shell: fixed rail on large screens, normal flow on small screens. */
+body.mtgx-admin-mode { background: #06080d; }
+body.mtgx-admin-mode .mtgx-light-beam,
+body.mtgx-admin-mode .mtgx-depth-orb,
+body.mtgx-admin-mode .mtgx-cursor-trail,
+body.mtgx-admin-mode .mtgx-particles,
+body.mtgx-admin-mode .mtgx-scroll-line,
+body.mtgx-admin-mode .mtgx-section-progress,
+body.mtgx-admin-mode .mtgx-online-badge { display: none !important; }
+
+.admin-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  display: flex;
+  align-items: stretch;
+  overflow-x: clip;
+}
+.admin-sidebar {
+  flex: 0 0 clamp(232px, 21vw, 270px);
+  width: clamp(232px, 21vw, 270px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-bottom: max(18px, var(--mtgx-safe-bottom));
+}
+.admin-sidebar nav { min-width: 0; }
+.admin-sidebar nav button {
+  min-height: var(--mtgx-touch);
+  min-width: 0;
+}
+.admin-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: calc(100% - clamp(232px, 21vw, 270px));
+  max-width: none;
+  margin-left: clamp(232px, 21vw, 270px);
+  padding-inline: var(--mtgx-page-gutter);
+  padding-bottom: max(56px, calc(32px + var(--mtgx-safe-bottom)));
+  overflow: clip;
+}
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  min-width: 0;
+  gap: 18px;
+  padding-block: 18px;
+  margin-bottom: 28px;
+  background: rgba(7, 10, 17, .92);
+}
+.admin-topbar > *, .admin-top-actions > * { min-width: 0; }
+.admin-top-actions { flex-wrap: wrap; justify-content: flex-end; }
+.admin-top-actions a, .admin-top-actions button { min-height: var(--mtgx-touch); }
+.admin-section { width: 100%; max-width: 1240px; min-width: 0; }
+
+.metric-grid, .overview-grid, .admin-two-col, .settings-grid, .notice-grid,
+.form-grid-2, .portfolio-grid, .inbox-grid, .admin-list, .list-card, .form-card {
+  min-width: 0;
+}
+.metric-grid > *, .overview-grid > *, .admin-two-col > *, .settings-grid > *,
+.notice-grid > *, .form-grid-2 > *, .portfolio-grid > *, .inbox-grid > * { min-width: 0; }
+.admin-section h1, .admin-section h2, .admin-section h3, .admin-section p,
+.admin-topbar h1, .admin-topbar p, .panel-title, .section-intro { max-width: 100%; overflow-wrap: anywhere; }
+.admin-section input, .admin-section select, .admin-section textarea,
+.mtgx-admin-broadcast input, .mtgx-admin-broadcast select, .mtgx-admin-broadcast textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.admin-section textarea { resize: vertical; min-height: 96px; }
+.admin-list, .list-row, .portfolio-admin-row, .inbox-item { min-width: 0; }
+.list-row > *, .portfolio-admin-row > *, .inbox-item > * { min-width: 0; }
+.list-row strong, .list-row span, .portfolio-admin-row strong, .portfolio-admin-row span,
+.inbox-item strong, .inbox-item span { overflow-wrap: anywhere; }
+
+/* Do not hide or fade live admin content. The old reveal and exit observers are
+   decorative on the storefront but unsafe for dynamic React panels. */
+.admin-page .mtgx-reveal,
+.admin-page .mtgx-motion-left,
+.admin-page .mtgx-motion-right,
+.admin-page .mtgx-motion-up,
+.admin-page .mtgx-motion-in,
+.admin-page .mtgx-reveal.mtgx-exit,
+.admin-page .mtgx-tilt,
+.admin-page .mtgx-sheen {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  filter: none !important;
+  animation: none !important;
+  transition: none !important;
+}
+.admin-page .mtgx-motion-line,
+.admin-page .mtgx-card-edge,
+.admin-page .mtgx-section-index { display: none !important; }
+.admin-page .mtgx-clickable { overflow: visible; }
+.admin-page .mtgx-ripple { display: none !important; }
+
+/* Honest empty state for the existing revenue chart when there are no interests yet. */
+.admin-page .chart { min-height: 210px; }
+.admin-page .chart-bars:has(.mtgx-empty-chart) { position: relative; }
+.mtgx-empty-chart {
+  position: absolute;
+  inset: 25px 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+}
+.mtgx-empty-bar-wrap {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mtgx-empty-bar-wrap i {
+  display: block;
+  width: min(30px, 70%);
+  min-height: 5px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, rgba(169, 200, 255, .5), rgba(169, 200, 255, .1));
+}
+.mtgx-empty-bar-wrap b {
+  color: #727d91;
+  font: 600 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* Tablet: reduce the rail before switching to the mobile navigation pattern. */
+@media (max-width: 1080px) {
+  :root { --mtgx-page-gutter: clamp(16px, 2.5vw, 28px); }
+  .admin-sidebar { width: 232px; flex-basis: 232px; }
+  .admin-main { width: calc(100% - 232px); margin-left: 232px; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .overview-grid, .admin-two-col, .settings-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .hero, .hero-section, .process-section, .split-section { gap: clamp(24px, 4vw, 48px); }
+}
+
+/* Mobile: the admin becomes a stable stacked app with a scrollable tab rail. */
+@media (max-width: 760px) {
+  :root { --mtgx-page-gutter: 16px; }
+  body { padding-bottom: var(--mtgx-safe-bottom); }
+  .admin-page { display: block; min-height: 100dvh; }
+  .admin-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    padding: 12px var(--mtgx-page-gutter) 10px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(190, 214, 255, .14);
+    background: rgba(7, 10, 17, .97);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .24);
+  }
+  .admin-sidebar > .admin-brand { margin-bottom: 10px; }
+  .admin-sidebar .admin-status { display: none; }
+  .admin-sidebar nav {
+    display: flex;
+    gap: 7px;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 1px 5px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .admin-sidebar nav::-webkit-scrollbar { display: none; }
+  .admin-sidebar nav button {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 42px;
+    white-space: nowrap;
+    padding: 9px 12px;
+    border-radius: 10px;
+  }
+  .admin-sidebar nav button span { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }
+  .admin-sidebar-foot { display: none; }
+  .admin-main {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    padding: 0 var(--mtgx-page-gutter) max(44px, calc(28px + var(--mtgx-safe-bottom)));
+  }
+  .admin-topbar {
+    position: relative;
+    height: auto;
+    min-height: 78px;
+    margin-inline: calc(var(--mtgx-page-gutter) * -1);
+    margin-bottom: 20px;
+    padding: 16px var(--mtgx-page-gutter);
+    align-items: center;
+  }
+  .admin-topbar h1 { margin: 4px 0 0; font-size: clamp(25px, 7vw, 34px); line-height: 1.05; }
+  .admin-top-actions { gap: 6px; }
+  .admin-top-actions a, .admin-top-actions button { padding-inline: 10px; }
+  .admin-top-actions a span { display: none; }
+  .welcome-row, .section-intro, .suggestion-strip { align-items: stretch; flex-direction: column; gap: 14px; }
+  .welcome-row h2, .section-intro h2 { font-size: clamp(34px, 10vw, 48px); line-height: .98; }
+  .metric-grid, .notice-grid, .form-grid-2, .portfolio-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .metric-card { min-height: 124px; padding: 15px; }
+  .metric-card strong { font-size: clamp(24px, 8vw, 34px); }
+  .settings-grid, .overview-grid, .admin-two-col { grid-template-columns: minmax(0, 1fr) !important; }
+  .mtgx-admin-broadcast { margin-inline: 0; padding: 16px; }
+  .mtgx-admin-broadcast .grid { grid-template-columns: minmax(0, 1fr); }
+  .mtgx-admin-broadcast .wide { grid-column: auto; }
+  .list-row, .portfolio-admin-row { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+  .list-row .row-actions, .portfolio-admin-row .row-actions { width: 100%; justify-content: flex-start; }
+  .inbox-item { flex-wrap: wrap; gap: 10px; }
+  .inbox-item select { width: 100%; max-width: none; margin-left: 0; }
+  .admin-section button, .form-card button { min-height: var(--mtgx-touch); }
+  .admin-section img { max-height: 220px; object-fit: cover; }
+}
+
+@media (max-width: 430px) {
+  .admin-top-actions a, .admin-top-actions button { min-width: 42px; padding-inline: 9px; }
+  .admin-top-actions svg { width: 16px; height: 16px; }
+  .admin-section { padding-inline: 0; }
+  .panel-title { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .key-gate { width: min(100%, 440px); padding: 24px 18px; }
+  .key-gate h1 { font-size: clamp(34px, 11vw, 42px); }
+  .hero-copy h1, .hero-section h1 { overflow-wrap: normal; }
+  .mtgx-profile-modal { padding: 10px; }
+  .mtgx-profile-body { padding-inline: 18px; }
+}
+
+/* Public mobile ergonomics and reduced decoration on touch screens. */
+@media (hover: none), (pointer: coarse) {
+  .product-card:hover, .portfolio-card:hover, .notice-card:hover,
+  .channel-card:hover, .quick-card:hover, .metric-card:hover { transform: none !important; }
+  .product-card:hover img, .portfolio-card:hover img, .hero-card:hover img { transform: none !important; }
+  .mtgx-hover-glow:hover { filter: none !important; box-shadow: none !important; }
+}
+
+@media (max-width: 700px) {
+  .mtgx-online-badge { bottom: max(10px, var(--mtgx-safe-bottom)); }
+  .mtgx-top-button { bottom: max(56px, calc(48px + var(--mtgx-safe-bottom))); }
+  .mtgx-sales-live { bottom: max(10px, var(--mtgx-safe-bottom)); width: calc(100% - 24px); }
+  .mtgx-profile-shell { max-height: calc(100dvh - 20px); }
+  .category-tabs, .filters { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

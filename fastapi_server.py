@@ -67,7 +67,7 @@ def require_trpc_admin(request: Request) -> None:
 def read_state() -> dict[str, Any]:
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not DATA_FILE.exists():
-        DATA_FILE.write_text(json.dumps({"settings": {}, "products": [], "tickets": [], "suggestions": [], "announcements": [], "stockRequests": [], "leads": [], "portfolio": [], "users": []}, ensure_ascii=False, indent=2), encoding="utf-8")
+        DATA_FILE.write_text(json.dumps({"settings": {}, "products": [], "tickets": [], "suggestions": [], "announcements": [], "stockRequests": [], "leads": [], "portfolio": [], "users": [], "accessCodes": []}, ensure_ascii=False, indent=2), encoding="utf-8")
     return json.loads(DATA_FILE.read_text(encoding="utf-8"))
 
 
@@ -117,6 +117,101 @@ def verify_key(value: str) -> bool:
     expected = str(state.get("settings", {}).get("adminKeyHash", ""))
     received = hashlib.sha256(value.strip().encode()).hexdigest()
     return bool(len(expected) == 64 and secrets.compare_digest(received, expected))
+
+
+def list_admins() -> list[dict[str, Any]]:
+    return [user for user in read_state().get("users", []) if user.get("role") == "admin"]
+
+
+def add_admin(open_id: str) -> dict[str, Any]:
+    normalized = open_id.strip()
+    with WRITE_LOCK:
+        state = read_state()
+        users = state.setdefault("users", [])
+        existing = next((user for user in users if str(user.get("openId", "")).strip() == normalized), None)
+        timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        if existing:
+            existing["role"] = "admin"
+            existing["updatedAt"] = timestamp
+            result = existing
+        else:
+            result = {"id": next_id(users), "openId": normalized, "name": "Administrador", "role": "admin", "createdAt": timestamp, "updatedAt": timestamp, "lastSignedIn": timestamp}
+            users.append(result)
+        write_state(state)
+        return result
+
+
+def user_directory() -> list[dict[str, Any]]:
+    state = read_state()
+    admins = {str(user.get("openId", "")) for user in state.get("users", []) if user.get("role") == "admin"}
+    directory: dict[str, dict[str, Any]] = {}
+
+    for user in state.get("users", []):
+        open_id = str(user.get("openId", "")).strip()
+        if not open_id:
+            continue
+        directory[open_id] = {"openId": open_id, "name": user.get("name") or "Usuário", "email": user.get("email") or "", "source": "conta", "isAdmin": open_id in admins}
+
+    sources = (("leads", "lead"), ("tickets", "ticket"), ("suggestions", "sugestão"), ("stockRequests", "estoque"))
+    for collection, source in sources:
+        for item in state.get(collection, []):
+            contact = str(item.get("contact") or item.get("email") or "").strip()
+            if not contact:
+                continue
+            open_id = f"contact:{contact}"
+            if open_id not in directory:
+                directory[open_id] = {"openId": open_id, "name": item.get("name") or item.get("customerName") or "Cliente", "email": contact, "source": source, "isAdmin": open_id in admins}
+
+    return sorted(directory.values(), key=lambda item: (item.get("isAdmin") is False, str(item.get("name", "")).lower()))
+
+
+def hash_value(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def create_access_code(product_id: int, delivery_url: str, note: str = "") -> dict[str, Any]:
+    with WRITE_LOCK:
+        state = read_state()
+        product = next((item for item in state.get("products", []) if int(item.get("id", 0)) == product_id and item.get("active", True) is not False), None)
+        if not product:
+            raise HTTPException(status_code=404, detail="Produto não encontrado")
+        code = f"MTGX-{secrets.token_hex(3).upper()}-{secrets.token_hex(3).upper()}"
+        timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        record = {"id": next_id(state.setdefault("accessCodes", [])), "codeHash": hash_value(code), "codePreview": code[-7:], "productId": product_id, "productName": product.get("name", "Produto"), "deliveryUrl": delivery_url.strip(), "note": note.strip(), "status": "available", "createdAt": timestamp, "usedAt": None, "accessTokenHash": None}
+        state["accessCodes"].append(record)
+        write_state(state)
+        return {"code": code, **{key: value for key, value in record.items() if key not in {"codeHash", "accessTokenHash"}}}
+
+
+def list_access_codes() -> list[dict[str, Any]]:
+    return [{key: value for key, value in record.items() if key not in {"codeHash", "accessTokenHash"}} for record in read_state().get("accessCodes", [])]
+
+
+def redeem_access_code(code: str) -> dict[str, Any]:
+    normalized = "".join(str(code).upper().split())
+    if len(normalized) < 8:
+        raise HTTPException(status_code=422, detail="Código inválido")
+    with WRITE_LOCK:
+        state = read_state()
+        record = next((item for item in state.get("accessCodes", []) if secrets.compare_digest(str(item.get("codeHash", "")), hash_value(normalized))), None)
+        if not record:
+            raise HTTPException(status_code=404, detail="Código não encontrado")
+        if record.get("status") != "available":
+            raise HTTPException(status_code=409, detail="Este código já foi utilizado")
+        token = secrets.token_urlsafe(24)
+        record["status"] = "used"
+        record["usedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        record["accessTokenHash"] = hash_value(token)
+        product = next((item for item in state.get("products", []) if int(item.get("id", 0)) == int(record.get("productId", 0))), {})
+        write_state(state)
+        return {"accessToken": token, "product": {"id": product.get("id"), "name": product.get("name", record.get("productName", "Produto")), "description": product.get("description", ""), "imageUrl": product.get("imageUrl", ""), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", "")}}
+
+
+def get_access(token: str) -> dict[str, Any]:
+    record = next((item for item in read_state().get("accessCodes", []) if item.get("status") == "used" and secrets.compare_digest(str(item.get("accessTokenHash", "")), hash_value(token))), None)
+    if not record:
+        raise HTTPException(status_code=404, detail="Acesso não encontrado")
+    return {"productId": record.get("productId"), "productName": record.get("productName"), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", ""), "usedAt": record.get("usedAt")}
 
 
 def allow_attempt(ip: str) -> bool:
@@ -192,28 +287,6 @@ def create_lead(payload: Payload):
     return add_item("leads", payload.model_dump())
 
 
-@app.post("/api/customers", status_code=201)
-def create_customer(payload: Payload):
-    values = payload.model_dump()
-    name = str(values.get("name", "")).strip()
-    contact = str(values.get("contact", "")).strip()
-    if not name or not contact:
-        raise HTTPException(status_code=422, detail="Nome e contato são obrigatórios")
-    with WRITE_LOCK:
-        state = read_state()
-        users = state.setdefault("users", [])
-        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        existing = next((item for item in users if str(item.get("contact", "")).lower() == contact.lower()), None)
-        if existing:
-            existing.update({"name": name, "lastSeenAt": now, "online": True})
-            write_state(state)
-            return existing
-        item = {"id": next_id(users), "name": name, "contact": contact, "createdAt": now, "lastSeenAt": now, "online": True, "source": values.get("source", "checkout")}
-        users.append(item)
-        write_state(state)
-        return item
-
-
 @app.post("/api/suggestions", status_code=201)
 def create_suggestion(payload: Payload):
     return add_item("suggestions", payload.model_dump())
@@ -228,41 +301,13 @@ def create_stock_request(payload: Payload):
 def admin_stats(_: str = Depends(admin_guard)):
     state = read_state()
     products = state.get("products", [])
-    # Keep the chart contract stable even when there are no recorded sales yet.
-    # Leads created through WhatsApp checkout may contain price/total fields.
-    from datetime import datetime, timedelta, timezone
-    now = datetime.now(timezone.utc)
-    leads = state.get("leads", [])
-    series = []
-    for offset in range(6, -1, -1):
-        day = (now - timedelta(days=offset)).date()
-        revenue = 0.0
-        orders = 0
-        for lead in leads:
-            stamp = str(lead.get("createdAt", ""))[:10]
-            if stamp != day.isoformat():
-                continue
-            orders += 1
-            raw = lead.get("total", lead.get("amount", lead.get("value", 0)))
-            if isinstance(raw, str):
-                raw = raw.replace("R$", "").replace(".", "").replace(",", ".").strip()
-            try:
-                revenue += float(raw or 0)
-            except (TypeError, ValueError):
-                pass
-        series.append({"date": day.isoformat(), "label": day.strftime("%d/%m"), "revenue": round(revenue, 2), "orders": orders})
-    return {"products": len([p for p in products if p.get("active", True)]), "lowStock": len([p for p in products if int(p.get("stock", 0)) <= 2]), "tickets": len(state.get("tickets", [])), "requests": len(state.get("stockRequests", [])), "suggestions": len(state.get("suggestions", [])), "leads": len(leads), "series": series}
+    return {"products": len([p for p in products if p.get("active", True)]), "lowStock": len([p for p in products if int(p.get("stock", 0)) <= 2]), "tickets": len(state.get("tickets", [])), "requests": len(state.get("stockRequests", [])), "suggestions": len(state.get("suggestions", [])), "leads": len(state.get("leads", []))}
 
 
 @app.get("/api/admin/inbox")
 def admin_inbox(_: str = Depends(admin_guard)):
     state = read_state()
     return {key: state.get(key, []) for key in ("tickets", "leads", "suggestions", "stockRequests")}
-
-
-@app.get("/api/admin/customers")
-def admin_customers(_: str = Depends(admin_guard)):
-    return read_state().get("users", [])
 
 
 @app.post("/api/admin/products", status_code=201)
@@ -338,6 +383,52 @@ def admin_settings(payload: Payload, _: str = Depends(admin_guard)):
         return state["settings"]
 
 
+@app.get("/api/admin/admins")
+def admin_admins(_: str = Depends(admin_guard)):
+    return list_admins()
+
+
+@app.post("/api/admin/admins", status_code=201)
+def admin_add_admin(payload: Payload, _: str = Depends(admin_guard)):
+    open_id = str(payload.model_dump().get("openId", "")).strip()
+    if len(open_id) < 3:
+        raise HTTPException(status_code=422, detail="Open ID inválido")
+    return add_admin(open_id)
+
+
+@app.get("/api/admin/user-directory")
+def admin_user_directory(_: str = Depends(admin_guard)):
+    return user_directory()
+
+
+@app.get("/api/admin/access-codes")
+def admin_access_codes(_: str = Depends(admin_guard)):
+    return list_access_codes()
+
+
+@app.post("/api/admin/access-codes", status_code=201)
+def admin_create_access_code(payload: Payload, _: str = Depends(admin_guard)):
+    values = payload.model_dump()
+    try:
+        product_id = int(values.get("productId", 0))
+    except (TypeError, ValueError):
+        product_id = 0
+    delivery_url = str(values.get("deliveryUrl", "")).strip()
+    if not delivery_url or not re.match(r"^(https?://|/)", delivery_url, re.IGNORECASE):
+        raise HTTPException(status_code=422, detail="Use um link HTTP(S) ou caminho local de entrega")
+    return create_access_code(product_id, delivery_url, str(values.get("note", "")))
+
+
+@app.post("/api/access/redeem")
+def access_redeem(payload: Payload):
+    return redeem_access_code(str(payload.model_dump().get("code", "")))
+
+
+@app.get("/api/access/{token}")
+def access_details(token: str):
+    return get_access(token)
+
+
 @app.api_route("/api/trpc/{procedures:path}", methods=["GET", "POST"])
 async def trpc_compat(procedures: str, request: Request):
     """Compatibility adapter for the compiled original React/tRPC client."""
@@ -366,6 +457,19 @@ async def trpc_compat(procedures: str, request: Request):
             require_trpc_admin(request)
             if name == "admin.settings":
                 responses[name] = state.get("settings", {})
+            elif name == "admin.userDirectory":
+                responses[name] = user_directory()
+            elif name == "admin.accessCodes":
+                responses[name] = list_access_codes()
+            elif name == "admin.generateAccessCode" and request.method == "POST":
+                responses[name] = create_access_code(int(value.get("productId", 0)), str(value.get("deliveryUrl", "")), str(value.get("note", "")))
+            elif name == "admin.admins":
+                responses[name] = list_admins()
+            elif name == "admin.addAdmin" and request.method == "POST":
+                open_id = str(value.get("openId", "")).strip()
+                if len(open_id) < 3:
+                    raise HTTPException(status_code=422, detail="Open ID inválido")
+                responses[name] = add_admin(open_id)
             elif name == "admin.saveSettings" and request.method == "POST":
                 values = dict(value)
                 new_key = values.pop("adminKey", None)
@@ -431,6 +535,8 @@ async def trpc_compat(procedures: str, request: Request):
             responses[name] = add_item("suggestions", value)
         elif name == "stock.request" and request.method == "POST":
             responses[name] = add_item("stockRequests", value)
+        elif name == "access.redeem" and request.method == "POST":
+            responses[name] = redeem_access_code(str(value.get("code", "")))
         else:
             raise HTTPException(status_code=404, detail=f"Procedimento tRPC não suportado: {name}")
     if len(responses) == 1:
