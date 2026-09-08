@@ -1,0 +1,16 @@
+/* MTGX Stores — mobile smooth pass */
+@media (max-width: 700px) {
+  html { overflow-x: hidden; }
+  body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+  .hero, .hero-section, .split-section, .section-block, main, .admin-page { min-width: 0 !important; }
+  .hero-card, .hero-aside, .hero-aside *, .hero-visual { transform: none !important; perspective: none !important; }
+  .hero-card { overflow: hidden !important; max-height: min(72svh, 640px); }
+  .hero-card img, .hero-visual img { width: 100% !important; height: auto !important; max-height: min(70svh, 620px); object-fit: contain !important; object-position: center !important; transform: none !important; }
+  .hero-card::before, .hero-card::after, .hero-visual::before, .hero-visual::after { animation: none !important; transform: none !important; }
+  .mtgx-depth-orb, .mtgx-light-beam, .mtgx-section-glint, .mtgx-cursor-trail { display: none !important; }
+  .mtgx-hover-glow, .mtgx-sheen, .mtgx-tilt { transition: none !important; filter: none !important; box-shadow: none !important; }
+  .mtgx-mobile-quick, .mtgx-top-button { will-change: auto !important; }
+}
+@media (prefers-reduced-motion: reduce), (max-width: 700px) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
