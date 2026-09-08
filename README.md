@@ -19,15 +19,15 @@ O provedor deve encaminhar o domínio para a porta definida pela variável `PORT
 
 ### Banco de dados
 
-O banco continua sendo **JSON**, armazenado em `data/store.json`. Faça backup desse arquivo antes de atualizações ou migrações. O servidor grava alterações de forma atômica para reduzir o risco de arquivo incompleto.
+O banco continua sendo **JSON**, armazenado em `store.json`. Faça backup desse arquivo antes de atualizações ou migrações. O servidor grava alterações de forma atômica para reduzir o risco de arquivo incompleto.
 
 ## Estrutura
 
 - `index.html`: entrada da vitrine.
 - `fastapi_server.py`: API FastAPI, arquivos estáticos, painel, estoque e persistência JSON.
 - `requirements.txt`: dependências Python.
-- `data/store.json`: banco de dados JSON.
-- `public/`: assets e aplicação compilada.
+- `store.json`: banco de dados JSON.
+- a pasta única do pacote: assets e aplicação compilada.
 - `server.mjs`: servidor Node opcional de compatibilidade.
 
 ## Endpoints principais
