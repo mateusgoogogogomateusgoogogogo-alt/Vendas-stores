@@ -1,6 +1,18 @@
 (() => {
-  const css=document.createElement('style');css.textContent='.mtgx-cart-feedback{position:fixed;z-index:1600;left:50%;top:76px;transform:translate(-50%,-10px);padding:10px 14px;border:1px solid rgba(171,204,255,.25);border-radius:10px;background:rgba(7,10,17,.92);backdrop-filter:blur(10px);color:#dbe9ff;font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;box-shadow:0 12px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease}.mtgx-cart-feedback.open{opacity:1;transform:translate(-50%,0)}';document.head.appendChild(css);
+  const css = document.createElement('style');
+  css.textContent = '.mtgx-cart-feedback{position:fixed;z-index:1600;left:50%;top:76px;transform:translate(-50%,-10px);padding:10px 14px;border:1px solid rgba(171,204,255,.25);border-radius:10px;background:rgba(7,10,17,.92);color:#dbe9ff;font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;box-shadow:0 12px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease}.mtgx-cart-feedback.open{opacity:1;transform:translate(-50%,0)}';
+  document.head.appendChild(css);
   let feedback;
-  const show=()=>{feedback??=(()=>{const el=document.createElement('div');el.className='mtgx-cart-feedback';document.body.appendChild(el);return el})();feedback.textContent='PEDIDO · CATÁLOGO PRONTO';feedback.classList.add('open');clearTimeout(feedback._timer);feedback._timer=setTimeout(()=>feedback.classList.remove('open'),1400)};
-  const bind=()=>{document.querySelectorAll('.header-cart,[aria-label="Abrir pedidos"]').forEach(btn=>{if(btn.dataset.mtgxCartFast)return;btn.dataset.mtgxCartFast='1';btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();const target=document.getElementById('catalogo');if(target){target.scrollIntoView({behavior:'auto',block:'start'});history.replaceState(null,'','#catalogo')}show()},{capture:true})})};bind();let pending=false;new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;bind()})}).observe(document.body,{childList:true,subtree:true});
+  const show = () => {
+    feedback ??= (() => { const el = document.createElement('div'); el.className = 'mtgx-cart-feedback'; document.body.appendChild(el); return el; })();
+    feedback.textContent = 'CATÁLOGO PRONTO';
+    feedback.classList.add('open');
+    clearTimeout(feedback._timer);
+    feedback._timer = setTimeout(() => feedback.classList.remove('open'), 1000);
+  };
+  // Passive notification only: never preventDefault/stopPropagation on React controls.
+  document.addEventListener('click', (event) => {
+    const el = event.target.closest?.('.header-cart,[aria-label="Abrir pedidos"]');
+    if (el) show();
+  }, { passive: true });
 })();

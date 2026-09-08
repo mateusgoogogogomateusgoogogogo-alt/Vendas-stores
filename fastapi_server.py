@@ -192,6 +192,28 @@ def create_lead(payload: Payload):
     return add_item("leads", payload.model_dump())
 
 
+@app.post("/api/customers", status_code=201)
+def create_customer(payload: Payload):
+    values = payload.model_dump()
+    name = str(values.get("name", "")).strip()
+    contact = str(values.get("contact", "")).strip()
+    if not name or not contact:
+        raise HTTPException(status_code=422, detail="Nome e contato são obrigatórios")
+    with WRITE_LOCK:
+        state = read_state()
+        users = state.setdefault("users", [])
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        existing = next((item for item in users if str(item.get("contact", "")).lower() == contact.lower()), None)
+        if existing:
+            existing.update({"name": name, "lastSeenAt": now, "online": True})
+            write_state(state)
+            return existing
+        item = {"id": next_id(users), "name": name, "contact": contact, "createdAt": now, "lastSeenAt": now, "online": True, "source": values.get("source", "checkout")}
+        users.append(item)
+        write_state(state)
+        return item
+
+
 @app.post("/api/suggestions", status_code=201)
 def create_suggestion(payload: Payload):
     return add_item("suggestions", payload.model_dump())
@@ -206,13 +228,41 @@ def create_stock_request(payload: Payload):
 def admin_stats(_: str = Depends(admin_guard)):
     state = read_state()
     products = state.get("products", [])
-    return {"products": len([p for p in products if p.get("active", True)]), "lowStock": len([p for p in products if int(p.get("stock", 0)) <= 2]), "tickets": len(state.get("tickets", [])), "requests": len(state.get("stockRequests", [])), "suggestions": len(state.get("suggestions", [])), "leads": len(state.get("leads", []))}
+    # Keep the chart contract stable even when there are no recorded sales yet.
+    # Leads created through WhatsApp checkout may contain price/total fields.
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    leads = state.get("leads", [])
+    series = []
+    for offset in range(6, -1, -1):
+        day = (now - timedelta(days=offset)).date()
+        revenue = 0.0
+        orders = 0
+        for lead in leads:
+            stamp = str(lead.get("createdAt", ""))[:10]
+            if stamp != day.isoformat():
+                continue
+            orders += 1
+            raw = lead.get("total", lead.get("amount", lead.get("value", 0)))
+            if isinstance(raw, str):
+                raw = raw.replace("R$", "").replace(".", "").replace(",", ".").strip()
+            try:
+                revenue += float(raw or 0)
+            except (TypeError, ValueError):
+                pass
+        series.append({"date": day.isoformat(), "label": day.strftime("%d/%m"), "revenue": round(revenue, 2), "orders": orders})
+    return {"products": len([p for p in products if p.get("active", True)]), "lowStock": len([p for p in products if int(p.get("stock", 0)) <= 2]), "tickets": len(state.get("tickets", [])), "requests": len(state.get("stockRequests", [])), "suggestions": len(state.get("suggestions", [])), "leads": len(leads), "series": series}
 
 
 @app.get("/api/admin/inbox")
 def admin_inbox(_: str = Depends(admin_guard)):
     state = read_state()
     return {key: state.get(key, []) for key in ("tickets", "leads", "suggestions", "stockRequests")}
+
+
+@app.get("/api/admin/customers")
+def admin_customers(_: str = Depends(admin_guard)):
+    return read_state().get("users", [])
 
 
 @app.post("/api/admin/products", status_code=201)
