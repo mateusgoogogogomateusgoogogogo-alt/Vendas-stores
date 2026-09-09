@@ -55,7 +55,8 @@
     if(getComputedStyle(target).position==='static') target.style.position='relative'; target.appendChild(ripple); setTimeout(()=>ripple.remove(),500);
   }, {passive:true});
   const progress = document.createElement('div'); progress.className = 'mtgx-reading-progress'; document.body.appendChild(progress);
-  const top = document.createElement('button'); top.className='mtgx-top-button'; top.type='button'; top.setAttribute('aria-label','Voltar ao topo'); top.textContent='↑'; document.body.appendChild(top);
+  const top = document.querySelector('.mtgx-top-button') || document.createElement('button');
+  if (!top.isConnected) { top.className='mtgx-top-button'; top.type='button'; top.setAttribute('aria-label','Voltar ao topo'); top.textContent='↑'; document.body.appendChild(top); }
   const quick = document.createElement('nav'); quick.className='mtgx-mobile-quick'; quick.setAttribute('aria-label','Ações rápidas');
   quick.innerHTML='<button type="button" data-action="catalog">VER PRODUTOS</button><button type="button" data-action="support">SUPORTE</button>';
   document.body.appendChild(quick);
@@ -67,7 +68,7 @@
   quick.addEventListener('click', e => { const action=e.target.closest('button')?.dataset.action; if(action==='catalog') catalog(); if(action==='support') support(); });
   top.addEventListener('click', () => scrollTo({top:0, behavior: reduced ? 'auto' : 'smooth'}));
   let scheduled=false;
-  const update = () => { scheduled=false; const max=document.documentElement.scrollHeight-innerHeight; const y=max>0 ? scrollY/max : 0; progress.style.transform=`scaleX(${Math.min(1,Math.max(0,y))})`; const visible=scrollY>420; top.classList.toggle('is-visible',visible); quick.classList.toggle('is-visible',scrollY>180); };
+  const update = () => { scheduled=false; const max=document.documentElement.scrollHeight-innerHeight; const y=max>0 ? scrollY/max : 0; progress.style.transform=`scaleX(${Math.min(1,Math.max(0,y))})`; const visible=scrollY>420; top.classList.toggle('is-visible',visible); top.classList.toggle('mtgx-show',visible); quick.classList.toggle('is-visible',scrollY>180); };
   addEventListener('scroll', () => { if(!scheduled){scheduled=true; requestAnimationFrame(update)} }, {passive:true});
   addEventListener('resize', update, {passive:true}); update();
   // Add accessible labels to icon-only controls without changing React markup.
