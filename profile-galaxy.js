@@ -13,9 +13,9 @@
 
   const css = document.createElement('style');
   css.textContent = `
-    .mtgx-profile-modal{--profile-galaxy-color:#8db8ff;--profile-galaxy-speed:18s;overflow:auto!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
+    .mtgx-profile-modal{--profile-galaxy-color:#8db8ff;--profile-galaxy-speed:18s;overflow-y:auto!important;overflow-x:hidden!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;padding-bottom:max(8px,env(safe-area-inset-bottom))}
     .mtgx-profile-modal.open{background:radial-gradient(circle at 50% 38%,rgba(64,91,190,.2),rgba(1,3,10,.9) 62%),rgba(0,0,0,.84)}
-    .mtgx-profile-shell{isolation:isolate;overflow:hidden!important;border-color:color-mix(in srgb,var(--profile-galaxy-color),white 28%)!important;box-shadow:0 30px 100px rgba(0,0,0,.8),0 0 70px color-mix(in srgb,var(--profile-galaxy-color),transparent 72%),inset 0 1px rgba(255,255,255,.2)!important}
+    .mtgx-profile-shell{isolation:isolate;overflow:auto!important;-webkit-overflow-scrolling:touch;border-color:color-mix(in srgb,var(--profile-galaxy-color),white 28%)!important;box-shadow:0 30px 100px rgba(0,0,0,.8),0 0 70px color-mix(in srgb,var(--profile-galaxy-color),transparent 72%),inset 0 1px rgba(255,255,255,.2)!important}
     .mtgx-profile-galaxy{position:absolute;z-index:0;inset:0;overflow:hidden;pointer-events:none;opacity:0;transform:scale(1.08);transition:opacity .55s ease,transform 1.1s cubic-bezier(.2,.8,.2,1);background:radial-gradient(ellipse at 50% 20%,color-mix(in srgb,var(--profile-galaxy-color),transparent 74%),transparent 43%),radial-gradient(ellipse at 15% 58%,rgba(183,117,255,.18),transparent 33%),radial-gradient(ellipse at 90% 82%,rgba(31,190,255,.15),transparent 34%)}
     .mtgx-profile-modal.open .mtgx-profile-galaxy{opacity:1;transform:scale(1)}
     .mtgx-profile-galaxy:before,.mtgx-profile-galaxy:after{content:"";position:absolute;left:50%;top:26%;width:145%;height:36%;border:1px solid color-mix(in srgb,var(--profile-galaxy-color),transparent 55%);border-radius:50%;transform:translate(-50%,-50%) rotate(-18deg);box-shadow:0 0 25px color-mix(in srgb,var(--profile-galaxy-color),transparent 64%),inset 0 0 22px color-mix(in srgb,var(--profile-galaxy-color),transparent 76%);opacity:.7;animation:mtgx-galaxy-orbit var(--profile-galaxy-speed) linear infinite}
