@@ -33,5 +33,11 @@
   };
 
   markAdmin();
-  new MutationObserver(markAdmin).observe(document.documentElement, { childList: true, subtree: true });
+  let pending = false;
+  new MutationObserver((records) => {
+    const relevant = records.some((record) => [...record.addedNodes].some((node) => node.nodeType === 1 && (node.matches?.('.admin-page,.chart-bars') || node.querySelector?.('.admin-page,.chart-bars'))));
+    if (!relevant || pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; markAdmin(); });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();

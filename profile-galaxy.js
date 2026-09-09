@@ -134,8 +134,9 @@
     ensureGalaxy();
     renderAdminSettings();
     let pending = false;
-    const observer = new MutationObserver(() => {
-      if (pending) return;
+    const observer = new MutationObserver(records => {
+      const relevant = records.some(record => [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches?.('.mtgx-profile-modal,.admin-main') || node.querySelector?.('.mtgx-profile-modal,.admin-main'))));
+      if (!relevant || pending) return;
       pending = true;
       requestAnimationFrame(() => { pending = false; ensureGalaxy(); renderAdminSettings(); });
     });
