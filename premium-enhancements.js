@@ -1,5 +1,6 @@
 (() => {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const saveData = !!navigator.connection?.saveData;
   const css = document.createElement('style');
   css.textContent = `
     :root{--background:#050608!important;--foreground:#e7edf5!important;--card:#0a0d12!important;--popover:#090c11!important;--muted:#11161d!important;--border:rgba(183,204,226,.14)!important;--ring:#6d91b8!important}
@@ -26,20 +27,21 @@
   document.head.appendChild(css);
   const vignette = document.createElement('div'); vignette.className='mtgx-dark-vignette'; document.body.appendChild(vignette);
   const spotlight = document.createElement('div'); spotlight.className='mtgx-spotlight'; document.body.appendChild(spotlight);
-  if (!reduced && innerWidth > 700) {
+  if (!reduced && !saveData && innerWidth > 700) {
     let spotFrame = 0, sx = 0, sy = 0;
     addEventListener('pointermove', e => { sx=e.clientX; sy=e.clientY; spotlight.style.opacity='.75'; if(!spotFrame) spotFrame=requestAnimationFrame(()=>{spotFrame=0;spotlight.style.left=`${sx}px`;spotlight.style.top=`${sy}px`}); }, {passive:true});
     addEventListener('blur', () => { spotlight.style.opacity='0'; }, {passive:true});
   }
-  const sheenTargets = () => document.querySelectorAll('.card,.product-card,[class*="product" i],[class*="portfolio" i]').forEach(el => el.classList.add('mtgx-sheen'));
-  const revealTargets = () => document.querySelectorAll('section,.section-block,.process-section,.split-section').forEach(el => el.classList.add('mtgx-reveal'));
+  const sheenTargets = (root=document) => root.querySelectorAll?.('.card,.product-card,[class*="product" i],[class*="portfolio" i]').forEach(el => el.classList.add('mtgx-sheen'));
+  const revealTargets = (root=document) => root.querySelectorAll?.('section,.section-block,.process-section,.split-section').forEach(el => el.classList.add('mtgx-reveal'));
   const revealObserver = new IntersectionObserver(entries => entries.forEach(entry => { if(entry.isIntersecting) { entry.target.classList.add('is-visible'); revealObserver.unobserve(entry.target); } }), {threshold:.08});
-  const observeReveals = () => document.querySelectorAll('.mtgx-reveal:not(.is-visible)').forEach(el => revealObserver.observe(el));
-  const enhance = () => { sheenTargets(); revealTargets(); observeReveals(); };
+  const observeReveals = (root=document) => root.querySelectorAll?.('.mtgx-reveal:not(.is-visible)').forEach(el => revealObserver.observe(el));
+  const enhance = (root=document) => { sheenTargets(root); revealTargets(root); observeReveals(root); };
   enhance();
-  new MutationObserver(() => requestAnimationFrame(enhance)).observe(document.body,{childList:true,subtree:true});
+  let enhanceFrame=0;
+  new MutationObserver(records => { const roots=records.flatMap(record => [...record.addedNodes]).filter(node => node.nodeType===1); if(!roots.length||enhanceFrame)return; enhanceFrame=requestAnimationFrame(()=>{enhanceFrame=0;roots.forEach(enhance)}); }).observe(document.body,{childList:true,subtree:true});
   document.addEventListener('focusin', event => event.target.closest?.('button,a,input,textarea,select')?.classList.add('mtgx-focus-visible'), {passive:true});
-  if (!reduced && innerWidth > 700) {
+  if (!reduced && !saveData && innerWidth > 700) {
     document.addEventListener('pointermove', event => {
       const card=event.target.closest?.('.mtgx-sheen'); if(!card) return;
       const r=card.getBoundingClientRect(); const px=(event.clientX-r.left)/r.width-.5; const py=(event.clientY-r.top)/r.height-.5;
@@ -47,13 +49,7 @@
     }, {passive:true});
     document.addEventListener('pointerout', event => { const card=event.target.closest?.('.mtgx-sheen'); if(card && !card.contains(event.relatedTarget)){card.style.setProperty('--mtgx-rx','0deg');card.style.setProperty('--mtgx-ry','0deg');} }, {passive:true});
   }
-  document.addEventListener('click', event => {
-    if (reduced) return;
-    const target = event.target.closest('button,a,[role="button"]'); if(!target) return;
-    const rect=target.getBoundingClientRect(); const size=Math.max(rect.width,rect.height); const ripple=document.createElement('i');
-    ripple.className='mtgx-ripple'; ripple.style.width=`${size}px`; ripple.style.height=`${size}px`; ripple.style.left=`${event.clientX-rect.left-size/2}px`; ripple.style.top=`${event.clientY-rect.top-size/2}px`;
-    if(getComputedStyle(target).position==='static') target.style.position='relative'; target.appendChild(ripple); setTimeout(()=>ripple.remove(),500);
-  }, {passive:true});
+  // O ripple único é gerenciado por animations.js, evitando dois listeners e duas mutações por clique.
   const progress = document.createElement('div'); progress.className = 'mtgx-reading-progress'; document.body.appendChild(progress);
   const top = document.querySelector('.mtgx-top-button') || document.createElement('button');
   if (!top.isConnected) { top.className='mtgx-top-button'; top.type='button'; top.setAttribute('aria-label','Voltar ao topo'); top.textContent='↑'; document.body.appendChild(top); }
