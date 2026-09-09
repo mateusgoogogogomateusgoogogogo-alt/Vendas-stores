@@ -14,8 +14,10 @@
   const recoverCatalog = () => {
     const grid = document.querySelector('.product-grid');
     const active = document.querySelector('.filters .filter.active, .category-tabs button.active');
-    if (!grid || !active || grid.querySelector('.product-card,.empty-state')) return;
+    if (!grid || !active) return false;
+    if (grid.querySelector('.product-card,.empty-state')) return true;
     active.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return false;
   };
   idle(optimize);
   let recoveryFrame = 0;
@@ -23,9 +25,9 @@
     if (recoveryFrame) return;
     recoveryFrame = requestAnimationFrame(() => {
       recoveryFrame = 0;
-      recoverCatalog();
+      if (recoverCatalog()) catalogObserver.disconnect();
     });
   });
   catalogObserver.observe(document.body, { childList: true, subtree: true });
-  setTimeout(recoverCatalog, 900);
+  setTimeout(() => { if (recoverCatalog()) catalogObserver.disconnect(); }, 900);
 })();
