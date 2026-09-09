@@ -15,7 +15,8 @@
     const grid = document.querySelector('.product-grid');
     const active = document.querySelector('.filters .filter.active, .category-tabs button.active');
     if (!grid || !active) return false;
-    if (grid.querySelector('.product-card,.empty-state')) return true;
+    if (grid.querySelector('.product-card')) return true;
+    if (grid.querySelector('.empty-state')) return false;
     active.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
     return false;
   };
@@ -29,5 +30,10 @@
     });
   });
   catalogObserver.observe(document.body, { childList: true, subtree: true });
-  setTimeout(() => { if (recoverCatalog()) catalogObserver.disconnect(); }, 900);
+  setTimeout(() => {
+    const grid = document.querySelector('.product-grid');
+    const active = document.querySelector('.filters .filter.active, .category-tabs button.active');
+    if (grid && active && !grid.querySelector('.product-card')) active.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    if (recoverCatalog()) catalogObserver.disconnect();
+  }, 1200);
 })();
