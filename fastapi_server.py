@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from urllib.parse import unquote
@@ -169,15 +170,20 @@ def hash_value(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def create_access_code(product_id: int, delivery_url: str, note: str = "") -> dict[str, Any]:
+def create_access_code(product_id: int, delivery_url: str = "", note: str = "") -> dict[str, Any]:
     with WRITE_LOCK:
         state = read_state()
         product = next((item for item in state.get("products", []) if int(item.get("id", 0)) == product_id and item.get("active", True) is not False), None)
         if not product:
             raise HTTPException(status_code=404, detail="Produto não encontrado")
+        access = product.get("accessConfig") or {}
+        delivery_url = str(delivery_url or access.get("deliveryUrl") or product.get("deliveryUrl") or "").strip()
+        note = str(note or access.get("instructions") or product.get("deliveryNote") or "").strip()
+        if not delivery_url or not re.match(r"^(https?://|/)", delivery_url, re.IGNORECASE):
+            raise HTTPException(status_code=422, detail="Configure um link HTTP(S) ou caminho local no acesso do produto")
         code = f"MTGX-{secrets.token_hex(3).upper()}-{secrets.token_hex(3).upper()}"
         timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        record = {"id": next_id(state.setdefault("accessCodes", [])), "codeHash": hash_value(code), "codePreview": code[-7:], "productId": product_id, "productName": product.get("name", "Produto"), "deliveryUrl": delivery_url.strip(), "note": note.strip(), "status": "available", "createdAt": timestamp, "usedAt": None, "accessTokenHash": None}
+        record = {"id": next_id(state.setdefault("accessCodes", [])), "codeHash": hash_value(code), "codePreview": code[-7:], "productId": product_id, "productName": product.get("name", "Produto"), "deliveryUrl": delivery_url, "note": note, "accessTitle": str(access.get("title") or "Acesso liberado"), "accessType": str(access.get("type") or "link"), "expiresInDays": int(access.get("expiresInDays") or 0), "status": "available", "createdAt": timestamp, "usedAt": None, "accessTokenHash": None}
         state["accessCodes"].append(record)
         write_state(state)
         return {"code": code, **{key: value for key, value in record.items() if key not in {"codeHash", "accessTokenHash"}}}
@@ -204,14 +210,14 @@ def redeem_access_code(code: str) -> dict[str, Any]:
         record["accessTokenHash"] = hash_value(token)
         product = next((item for item in state.get("products", []) if int(item.get("id", 0)) == int(record.get("productId", 0))), {})
         write_state(state)
-        return {"accessToken": token, "product": {"id": product.get("id"), "name": product.get("name", record.get("productName", "Produto")), "description": product.get("description", ""), "imageUrl": product.get("imageUrl", ""), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", "")}}
+        return {"accessToken": token, "product": {"id": product.get("id"), "name": product.get("name", record.get("productName", "Produto")), "description": product.get("description", ""), "imageUrl": product.get("imageUrl", ""), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", ""), "accessTitle": record.get("accessTitle", "Acesso liberado"), "accessType": record.get("accessType", "link"), "expiresInDays": record.get("expiresInDays", 0)}}
 
 
 def get_access(token: str) -> dict[str, Any]:
     record = next((item for item in read_state().get("accessCodes", []) if item.get("status") == "used" and secrets.compare_digest(str(item.get("accessTokenHash", "")), hash_value(token))), None)
     if not record:
         raise HTTPException(status_code=404, detail="Acesso não encontrado")
-    return {"productId": record.get("productId"), "productName": record.get("productName"), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", ""), "usedAt": record.get("usedAt")}
+    return {"productId": record.get("productId"), "productName": record.get("productName"), "deliveryUrl": record.get("deliveryUrl", ""), "note": record.get("note", ""), "accessTitle": record.get("accessTitle", "Acesso liberado"), "accessType": record.get("accessType", "link"), "expiresInDays": record.get("expiresInDays", 0), "usedAt": record.get("usedAt")}
 
 
 def allow_attempt(ip: str) -> bool:
@@ -414,7 +420,7 @@ def admin_create_access_code(payload: Payload, _: str = Depends(admin_guard)):
     except (TypeError, ValueError):
         product_id = 0
     delivery_url = str(values.get("deliveryUrl", "")).strip()
-    if not delivery_url or not re.match(r"^(https?://|/)", delivery_url, re.IGNORECASE):
+    if delivery_url and not re.match(r"^(https?://|/)", delivery_url, re.IGNORECASE):
         raise HTTPException(status_code=422, detail="Use um link HTTP(S) ou caminho local de entrega")
     return create_access_code(product_id, delivery_url, str(values.get("note", "")))
 
