@@ -75,3 +75,12 @@
   .mtgx-depth-orb, .mtgx-light-beam, .mtgx-cursor-trail, .mtgx-spotlight, .mtgx-particles { display: none !important; }
   [class*="card" i], [class*="panel" i], [class*="modal" i], [class*="dialog" i], .mtgx-mobile-quick { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 }
+
+@media (max-width: 700px) {
+  .header-actions .header-wa { display:grid !important; place-items:center; width:42px !important; padding:0 !important; color:#dceeff !important; border:1px solid rgba(183,204,226,.18); border-radius:11px; background:rgba(8,12,20,.72); }
+  .header-actions .header-wa span { display:none !important; }
+  .header-actions .header-wa svg { display:block !important; width:17px; height:17px; }
+  .header-actions .header-cart { width:42px !important; padding:0 !important; justify-content:center; }
+  .header-actions .header-cart svg { width:17px; height:17px; }
+  .mtgx-access-launcher { bottom:calc(78px + env(safe-area-inset-bottom)) !important; }
+}
