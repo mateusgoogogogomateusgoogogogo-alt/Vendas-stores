@@ -346,6 +346,14 @@ def admin_delete_announcement(item_id: int, _: str = Depends(admin_guard)):
     return {"success": remove_item("announcements", item_id)}
 
 
+@app.patch("/api/admin/announcements/{item_id}")
+def admin_update_announcement(item_id: int, payload: Payload, _: str = Depends(admin_guard)):
+    item = update_item("announcements", item_id, payload.model_dump(exclude_unset=True))
+    if not item:
+        raise HTTPException(status_code=404, detail="Anúncio não encontrado")
+    return item
+
+
 @app.post("/api/admin/portfolio", status_code=201)
 def admin_create_portfolio(payload: Payload, _: str = Depends(admin_guard)):
     return add_item("portfolio", payload.model_dump())
